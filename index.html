@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3EEK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght=600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#121212;
+  --focus-bg:#181818;
+  --white:#e5e5e5;
+  --blue:#2f80ed;
+  --g1:#1e1e1e;
+  --g2:#333333;
+  --g3:#666666;
+  --g4:#aaaaaa;
+  --done:#222222; /* 更暗的完成事项颜色 */
+  --dim:rgba(255,255,255,0.03);
+  --dim2:rgba(255,255,255,0.06);
+  --sep:rgba(255,255,255,0.08);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--white);-webkit-user-select:none;user-select:none;}
+body{display:flex;flex-direction:column;font-family:'Courier New',Courier,monospace;}
+
+/* ── BAR (Tightened) ── */
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;flex-shrink:0;background:var(--bg);position:relative;}
+
+/* left side of bar: gear + Saturday button */
+.bar-left{display:flex;align-items:center;gap:10px;}
+
+/* gear/edit button */
+.gear-btn{background:none;border:none;color:var(--g3);padding:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .15s;}
+.gear-btn.active{color:var(--white);}
+.gear-btn:active{opacity:0.6;}
+.gear-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* top-left Saturday button */
+.sat-btn{background:none;border:1px solid var(--dim2);color:var(--g3);padding:3px 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:'Courier New',monospace;font-size:0.52rem;letter-spacing:0.05em;border-radius:2px;transition:color .15s, border-color .15s;}
+.sat-btn.active{color:var(--blue);border-color:var(--blue);}
+.sat-btn:active{opacity:0.6;}
+
+/* undo/redo center */
+.bar-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;}
+.ur-btn{background:none;border:none;color:var(--g3);padding:6px 10px;cursor:pointer;display:flex;align-items:center;transition:color .15s;}
+.ur-btn:not(:disabled):active{color:var(--white);}
+.ur-btn:disabled{opacity:0.15;cursor:default;}
+.ur-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* week toggle */
+.vtoggle{background:none;border:none;color:var(--g3);padding:6px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:'Courier New',monospace;font-size:0.56rem;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;transition:color .15s;}
+.vtoggle:active{opacity:0.6;}
+.tsv{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ── STRIP row (Strictly 7 Days) ── */
+.strip-wrap{display:flex;align-items:stretch;background:var(--bg);flex-shrink:0;}
+.strip{display:flex;flex:1;padding:4px 16px;gap:4px;}
+
+/* day pill */
+.dpill{flex:1;border:none;background:none;display:flex;flex-direction:column;align-items:center;padding:4px 2px 6px;cursor:pointer;border-bottom:2px solid transparent;transition:border-color .15s;position:relative;}
+.dpill.past .pname,.dpill.past .pnum{color:var(--g2);}
+.pname{font-size:0.38rem;letter-spacing:0.14em;color:var(--g3);text-transform:uppercase;margin-bottom:3px;}
+.pnum{font-size:0.95rem;font-weight:700;color:var(--g3);width:24px;height:24px;display:flex;align-items:center;justify-content:center;}
+.dpill.today{border-bottom-color:var(--blue);}
+.dpill.today .pnum{color:var(--blue);}
+.dpill.active:not(.today) .pnum{color:var(--white);}
+.pdot{width:3px;height:3px;border-radius:50%;background:var(--g3);margin-top:3px;opacity:0;}
+.dpill.has-tasks .pdot{opacity:0.6;}
+
+/* ── MAIN ── */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── DAY VIEW ── */
+.day-view{height:100%;display:flex;flex-direction:column;}
+
+/* Sub-header line (Tightened) */
+.dv-sub-head{display:flex;align-items:center;justify-content:space-between;padding:2px 16px 8px;flex-shrink:0;background:var(--bg);}
+.dv-name{font-size:2.2rem;font-weight:700;letter-spacing:0.02em;color:var(--white);}
+.dv-name.is-past{color:var(--g3);}
+
+/* Right side copy/paste buttons */
+.day-cp-wrap{display:flex;align-items:center;gap:12px;}
+.day-cp-btn{background:none;border:none;color:var(--g3);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:6px;transition:color .18s;}
+.day-cp-btn:active{color:var(--white);}
+.day-cp-btn.disabled{color:var(--g2);opacity:0.2;pointer-events:none;}
+.day-cp-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+.tasks-scroll{flex:1;overflow-y:auto;}
+.tasks-scroll::-webkit-scrollbar{display:none;}
+
+/* FOCUS ZONE (Tightened) */
+.focus-zone{background:var(--focus-bg);padding:4px 16px;}
+.focus-zone .task-row{border-bottom:none;}
+.focus-sep{height:1px;background:var(--dim);}
+.tasks-zone{padding:4px 16px 100px;background:var(--bg);}
+
+/* task row (Compress padding further) */
+.task-row{display:flex;align-items:flex-start;gap:10px;padding:3px 0;border-bottom:1px solid var(--dim);position:relative;}
+.task-row.drag-over{border-top:1px solid var(--blue);}
+.task-row.dragging{opacity:0.3;}
+
+.cb{width:15px;height:15px;border:1.5px solid var(--g3);flex-shrink:0;cursor:pointer;margin-top:3px;display:flex;align-items:center;justify-content:center;border-radius:2px;transition:border-color .15s;}
+.cb.on{border-color:var(--done) !important;background:var(--done) !important;}
+.cb .ck{display:none;width:10px;height:10px;stroke:var(--bg);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;}
+.cb.on .ck{display:block;}
+.cb.ro{cursor:default;}
+
+/* Content Wrap inside Task Row */
+.row-content{flex:1;display:flex;flex-direction:column;position:relative;}
+
+/* Tightened line-height and height */
+.ttxt{width:100%;font-family:'Courier New',Courier,monospace;font-size:18px;line-height:1.3;outline:none;border:none;background:none;resize:none;caret-color:var(--blue);min-height:22px;color:var(--white);-webkit-user-select:text;user-select:text;}
+.ttxt.done{color:var(--done) !important;text-decoration:line-through;}
+.ttxt[readonly]{color:var(--g3);cursor:default;}
+
+/* Important branding blue for first row */
+.focus-row .ttxt{font-weight:700;color:var(--blue) !important;}
+.focus-row .ttxt.done{color:var(--done) !important;}
+
+/* Single Row Action Group: Positioned at the bottom-right of the row */
+.row-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:1px;flex-shrink:0;opacity:0.7;}
+.task-row:hover .row-actions{opacity:1;}
+
+/* drag handle: Only visible in edit mode, replaces other buttons */
+.drag-handle{display:none;align-items:center;justify-content:center;cursor:grab;color:var(--g3);width:46px;height:16px;margin-top:1px;touch-action:none;}
+.drag-handle:active{cursor:grabbing;color:var(--white);}
+.drag-handle svg{width:36px;height:10px;}
+
+/* Edit Mode Switching rules */
+body.edit-mode .row-actions{display:none !important;}
+body.edit-mode .cb{display:none !important;}
+body.edit-mode .drag-handle{display:flex !important;}
+
+.btn-ic{background:none;border:none;cursor:pointer;flex-shrink:0;display:flex;align-items:center;padding:2px;color:var(--g3);transition:color .18s;}
+.btn-ic:active{color:var(--white);}
+.btn-ic.del:active{color:#b03030;}
+.btn-ic svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+
+/* Input Row (Tightened) */
+.add-row{display:flex;align-items:center;padding:4px 0;}
+.add-inp{flex:1;background:none;border:none;font-family:'Courier New',Courier,monospace;font-size:18px;color:var(--white);outline:none;caret-color:var(--blue);-webkit-user-select:text;user-select:text;}
+
+/* ── WEEK VIEW ── */
+.week-view{height:100%;display:grid;grid-template-columns:repeat(8,1fr);gap:1px;background:var(--dim);}
+.wcol{background:var(--bg);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;position:relative;}
+.wcol:active{opacity:0.7;}
+.wcol.past-col .wname,.wcol.past-col .wnum{color:var(--g2);}
+.wcol-head{padding:8px 6px;flex-shrink:0;border-bottom:1px solid var(--dim);}
+.wcol.today .wcol-head{border-top:2px solid var(--blue);}
+.wname{font-size:0.35rem;letter-spacing:0.12em;color:var(--g3);text-transform:uppercase;margin-bottom:3px;}
+.wnum{font-size:0.85rem;font-weight:700;color:var(--g3);}
+.wcol.today .wnum{color:var(--blue);}
+.wcol.active-col:not(.today) .wnum{color:var(--white);}
+.wtasks{flex:1;padding:6px 4px;overflow:hidden;display:flex;flex-direction:column;gap:3px;}
+.wt{display:flex;align-items:flex-start;gap:3px;}
+.wt-box{width:5px;height:5px;border:1px solid var(--g3);flex-shrink:0;margin-top:4px;border-radius:1px;}
+.wt-box.done{background:var(--done); border-color:var(--done);}
+.wt-txt{font-family:'Courier New',monospace;font-size:0.38rem;color:var(--g4);line-height:1.35;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%;}
+.wt-txt.done{color:var(--done) !important;text-decoration:line-through;}
+.wt-more{font-size:0.36rem;color:var(--g3);margin-top:1px;}
+
+/* modes */
+.v-day,.v-week{display:none;}
+body.m-day .v-day{display:flex;}
+body.m-week .v-week{display:grid;}
+body.m-week .strip-wrap{display:none;}
+
+/* Toast (positioned elegantly above the footer signature, with extra safe spacing) */
+.toast-container{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);pointer-events:none;z-index:99;display:flex;flex-direction:column;align-items:center;}
+.toast{background:var(--focus-bg);border:1px solid var(--dim2);color:var(--g4);font-family:'Courier New',monospace;font-size:0.62rem;letter-spacing:0.12em;padding:6px 14px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;border-radius:2px;}
+.toast.show{opacity:1;transform:translateY(0);}
+
+/* Footer Signature (Tightened lines and overall padding) */
+.footer{flex-shrink:0;text-align:center;padding:6px 0 10px;background:none;position:relative;}
+.footer-slogan{font-family:'Courier New',monospace;font-size:0.56rem;letter-spacing:0.1em;color:var(--g3);margin-bottom:24px;opacity:0.85;} /* 隔2行标语间距 */
+.footer-line{font-family:'Courier New',monospace;font-size:0.56rem;letter-spacing:0.1em;color:var(--g3);line-height:1.35;}
+.footer-line a{color:var(--g3);text-decoration:none;transition:color .15s;}
+.footer-line a:hover{color:var(--white);}
+.footer-corner{position:absolute;bottom:8px;cursor:pointer;opacity:0.4;transition:opacity .15s;background:none;border:none;display:flex;align-items:center;justify-content:center;padding:6px;font-size:1.1rem;line-height:1;}
+.footer-corner:active{opacity:1;}
+.footer-corner.left{left:20px;}
+.footer-corner.right{right:20px;}
+</style>
+</head>
+<body class="m-day">
+
+<!-- TOP BAR -->
+<div class="bar">
+  <!-- Left: gear and Saturday button -->
+  <div class="bar-left">
+    <button class="gear-btn" id="gearBtn" onclick="toggleEditMode()" title="Toggle edit mode">
+      <svg viewBox="0 0 24 24">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+      </svg>
+    </button>
+    <button class="sat-btn" id="satBtn" onclick="goPrevSat()" title="Previous Saturday">
+      SAT <span id="satDate"></span>
+    </button>
+  </div>
+
+  <!-- center undo/redo -->
+  <div class="bar-center">
+    <button class="ur-btn" id="undoBtn" onclick="doUndo()" disabled title="Undo">
+      <svg viewBox="0 0 24 24">
+        <path d="M3 7v6h6"></path>
+        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+      </svg>
+    </button>
+    <button class="ur-btn" id="redoBtn" onclick="doRedo()" disabled title="Redo">
+      <svg viewBox="0 0 24 24">
+        <path d="M21 7v6h-6"></path>
+        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Right: toggle week/day view -->
+  <button class="vtoggle" onclick="toggleView()">
+    <!-- Minimalist Line Loop-Swap (🔁) Style Icon -->
+    <svg class="tsv" viewBox="0 0 24 24">
+      <path d="M17 1l4 4-4 4"></path>
+      <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+      <path d="M7 23l-4-4 4-4"></path>
+      <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+    </svg>
+    <span id="tlabel">WEEK</span>
+  </button>
+</div>
+
+<!-- STRIP (DAY VIEW ONLY - Strictly 7 Days) -->
+<div class="strip-wrap">
+  <div class="strip" id="strip"></div>
+</div>
+
+<div class="main">
+  <!-- DAY VIEW -->
+  <div class="day-view v-day">
+    <!-- Sub-header line -->
+    <div class="dv-sub-head" id="dvSubHead">
+      <div class="dv-name" id="dvName"></div>
+      
+      <!-- Action buttons -->
+      <div class="day-cp-wrap" id="dayCpWrap">
+        <button class="day-cp-btn" id="dayCopyBtn" onclick="copyDayActive()" title="Copy entire day">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <button class="day-cp-btn" id="dayPasteBtn" onclick="pasteDayFromClipboard()" title="Paste to day">
+          <svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="tasks-scroll" id="tasksList"></div>
+  </div>
+  
+  <!-- WEEK VIEW -->
+  <div class="week-view v-week" id="weekView"></div>
+</div>
+
+<!-- Toast Box Container -->
+<div class="toast-container">
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <button class="footer-corner left" onclick="openMeditation()" title="Zen Meditation">🧘</button>
+  
+  <div class="footer-slogan">" 在 零 散 中 堆 砌 "</div>
+  <div class="footer-line">Create by</div>
+  <div class="footer-line"><a href="https://linktr.ee/theapEart" target="_blank">https://linktr.ee/theapEart</a></div>
+  
+  <button class="footer-corner right" onclick="openVocab()" title="Learn English">🇬🇧</button>
+</div>
+
+<script>
+const DS=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const now=new Date();now.setHours(0,0,0,0);
+const TOD=now.getTime();
+let active=TOD,mode='day';
+let editMode=false;
+
+// ── DATE CALCULATIONS ──
+// DAY strip shows strictly 7 days of the current week (Sun-Sat)
+function get7DaysList(){
+  const d=new Date(now);
+  d.setDate(now.getDate()-now.getDay()); // Sunday of current week
+  return Array.from({length:7},(_,i)=>{
+    const x=new Date(d);
+    x.setDate(d.getDate()+i);
+    return x;
+  });
+}
+
+// WEEK view shows 8 columns: Previous Saturday + 7 days of current week
+function get8DaysList(){
+  const d=new Date(now);
+  d.setDate(now.getDate()-now.getDay()); // Sunday of current week
+  const prevSat=new Date(d);
+  prevSat.setDate(d.getDate()-1);
+  const week=Array.from({length:7},(_,i)=>{
+    const x=new Date(d);
+    x.setDate(d.getDate()+i);
+    return x;
+  });
+  return [prevSat, ...week];
+}
+
+const STRIP_DAYS = get7DaysList();
+const COMMON_DAYS = get8DaysList();
+
+// Calculate previous Saturday date objects
+const d_sunday = new Date(now);
+d_sunday.setDate(now.getDate() - now.getDay());
+const prevSat = new Date(d_sunday);
+prevSat.setDate(d_sunday.getDate() - 1);
+
+// Set top-left Saturday button text dynamically
+document.getElementById('satDate').textContent = prevSat.getDate();
+
+function dkey(d){return'tk16_'+d.toISOString().slice(0,10);}
+function load(d){try{return JSON.parse(localStorage.getItem(dkey(d))||'[]');}catch{return[];}}
+function saveD(d,a){localStorage.setItem(dkey(d),JSON.stringify(a));}
+function isPast(d){return d.getTime()<TOD;}
+
+// ── CLIPBOARD & STORAGE ──
+let dayClipboard=null;
+
+// ── UNDO / REDO ──
+const undoMap={};
+function getUS(d){const k=dkey(d);if(!undoMap[k])undoMap[k]={stack:[],idx:-1};return undoMap[k];}
+function pushUndo(d,tasks){
+  if(isPast(d))return;
+  const us=getUS(d);
+  us.stack=us.stack.slice(0,us.idx+1);
+  us.stack.push(JSON.stringify(tasks));
+  us.idx=us.stack.length-1;
+  updateUrBtns(d);
+}
+function doUndo(){
+  const d=new Date(active);if(isPast(d))return;
+  const us=getUS(d);if(us.idx<=0)return;
+  us.idx--;
+  saveD(d,JSON.parse(us.stack[us.idx]));
+  rList(d,false);rStrip();updateUrBtns(d);
+}
+function doRedo(){
+  const d=new Date(active);if(isPast(d))return;
+  const us=getUS(d);if(us.idx >= us.stack.length-1)return;
+  us.idx++;
+  saveD(d,JSON.parse(us.stack[us.idx]));
+  rList(d,false);rStrip();updateUrBtns(d);
+}
+function updateUrBtns(d){
+  const past=isPast(d);
+  const ub=document.getElementById('undoBtn');
+  const rb=document.getElementById('redoBtn');
+  if(past){ub.disabled=true;rb.disabled=true;return;}
+  const us=getUS(d);
+  ub.disabled=(us.idx<=0);
+  rb.disabled=(us.idx>=us.stack.length-1);
+}
+function saveDU(d,tasks){saveD(d,tasks);pushUndo(d,tasks);}
+
+// ── EDIT MODE TOGGLE ──
+function toggleEditMode(){
+  editMode=!editMode;
+  document.body.classList.toggle('edit-mode',editMode);
+  document.getElementById('gearBtn').classList.toggle('active',editMode);
+}
+
+// ── TOAST (clean lowercase) ──
+let _tt=null;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg.toLowerCase();
+  el.classList.add('show');
+  if(_tt)clearTimeout(_tt);
+  _tt=setTimeout(()=>el.classList.remove('show'),1400);
+}
+
+// ── COPY DAY ──
+function copyDayActive(){
+  copyDay(new Date(active));
+}
+function copyDay(d){
+  const tasks=load(d).filter(t=>t.text.trim());
+  dayClipboard={tasks:JSON.parse(JSON.stringify(tasks))};
+  try {
+    const txt=tasks.map(t=>(t.done?'[x] ':'')+t.text).join('\n');
+    document.execCommand('copy'); 
+    navigator.clipboard.writeText(txt).catch(()=>{});
+  }catch(e){}
+  showToast('day copied');
+}
+
+// ── COPY SINGLE ROW ──
+function copyRow(text){
+  try {
+    document.execCommand('copy');
+    navigator.clipboard.writeText(text).catch(()=>{});
+  } catch(e){}
+  showToast('row copied');
+}
+
+// ── PASTE SINGLE ROW ──
+async function pasteRow(d,past,afterIdx){
+  if(past)return;
+  let text = "";
+  try{text=await navigator.clipboard.readText();}catch(e){}
+  if(!text && dayClipboard && dayClipboard.tasks.length){
+    text = dayClipboard.tasks[0].text;
+  }
+  if(!text || !text.trim())return;
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length)return;
+  const tasks=load(d);
+  const insertAt=Math.min(afterIdx+1,tasks.length);
+  tasks.splice(insertAt,0,...lines.map(l=>({text:l,done:false})));
+  saveDU(d,tasks);rList(d,false);rStrip();
+  focusNth(insertAt+lines.length-1);
+  showToast('pasted');
+}
+
+// ── PASTE DAY ──
+async function pasteDayFromClipboard(){
+  const d=new Date(active);
+  if(isPast(d))return;
+
+  let incoming=null;
+  try{
+    const raw=await navigator.clipboard.readText();
+    const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    if(lines.length)incoming=lines.map(l=>({text:l.replace(/^\[x\]\s*/,''),done:l.startsWith('[x]')}));
+  }catch(e){}
+
+  if(!incoming && dayClipboard && dayClipboard.tasks.length){
+    incoming=dayClipboard.tasks.map(t=>({text:t.text,done:t.done}));
+  }
+  if(!incoming||!incoming.length)return;
+
+  let tasks=load(d);
+  
+  // Find first clean line
+  let cleanStartIndex = tasks.length;
+  for(let i=0; i<tasks.length; i++){
+    let slice = tasks.slice(i);
+    let restHasContent = slice.some(t => t.text.trim().length > 0);
+    if(!restHasContent){
+      cleanStartIndex = i;
+      break;
+    }
+  }
+
+  tasks = tasks.slice(0, cleanStartIndex);
+  incoming.forEach(t=>tasks.push(t));
+  
+  saveDU(d,tasks);rList(d,false);rStrip();
+  showToast('day pasted');
+}
+
+// ── FOOTER ACTIONS ──
+function openMeditation(){showToast('coming soon');}
+function openVocab(){showToast('coming soon');}
+
+// SVG Icons
+const SVG_CK=`<svg class="ck" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const SVG_TR=`<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6m4-6v6"></path><path d="M9 6V4h6v2"></path></svg>`;
+const SVG_PL=`<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+const SVG_COPY=`<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+const SVG_PASTE=`<svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path></svg>`;
+// Extra long double line drag handle (=)
+const SVG_DRAG=`<svg viewBox="0 0 24 24"><line x1="0" y1="9" x2="24" y2="9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="0" y1="15" x2="24" y2="15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+
+// ── RENDER ROW ──
+let dragSrcIdx=null;
+
+function makeRow(tasks,i,d,past){
+  const t=tasks[i];
+  const row=document.createElement('div');
+  row.className='task-row'+(i===0?' focus-row':'');
+  row.dataset.idx=i;
+
+  // CHECKBOX
+  const cb=document.createElement('div');
+  cb.className='cb'+(t.done?' on':'')+(past?' ro':'');
+  cb.innerHTML=SVG_CK;
+  if(!past){
+    cb.onclick=()=>{tasks[i].done=!tasks[i].done;saveDU(d,tasks);rList(d,past);rStrip();};
+  }
+
+  // CONTENT CONTAINER (Textarea + Action Row placed right underneath)
+  const contentWrap = document.createElement('div');
+  contentWrap.className = 'row-content';
+
+  // TEXTAREA
+  const tx=document.createElement('textarea');
+  tx.className='ttxt'+(t.done?' done':'');
+  tx.value=t.text;tx.rows=1;
+  tx.setAttribute('enterkeyhint','next');
+
+  if(past){
+    tx.readOnly=true;
+  } else {
+    tx.addEventListener('paste',function(e){
+      e.preventDefault();
+      const raw=(e.clipboardData||window.clipboardData).getData('text');
+      const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if(!lines.length)return;
+      if(lines.length===1){
+        const s=this.selectionStart,en=this.selectionEnd,v=this.value;
+        tasks[i].text=v.slice(0,s)+lines[0]+v.slice(en);
+        saveDU(d,tasks);rList(d,past);rStrip();
+        setTimeout(()=>{const rs=document.querySelectorAll('.ttxt:not([readonly])');if(rs[i]){rs[i].focus();rs[i].setSelectionRange(s+lines[0].length,s+lines[0].length);}},25);
+        return;
+      }
+      tasks[i].text=lines[0];
+      tasks.splice(i+1,0,...lines.slice(1).map(l=>({text:l,done:false})));
+      saveDU(d,tasks);rList(d,past);rStrip();
+      focusNth(i+lines.length-1);
+    });
+    tx.oninput=function(){
+      this.style.height='auto';this.style.height=this.scrollHeight+'px';
+      tasks[i].text=this.value;saveDU(d,tasks);rStrip();
+    };
+    tx.onkeydown=function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        tasks[i].text=this.value;
+        tasks.splice(i+1,0,{text:'',done:false});
+        saveDU(d,tasks);rList(d,past);rStrip();
+        focusNth(i+1);
+      }
+    };
+  }
+  setTimeout(()=>{tx.style.height='auto';tx.style.height=tx.scrollHeight+'px';},0);
+  contentWrap.appendChild(tx);
+
+  // ROW-ACTIONS: Placed below the text on the right
+  const actGroup = document.createElement('div');
+  actGroup.className = 'row-actions';
+
+  // Copy is ALWAYS available, even for past items
+  const cpb=document.createElement('button');
+  cpb.className='btn-ic';cpb.innerHTML=SVG_COPY;cpb.title='Copy row';
+  cpb.onclick=()=>{
+    const txts=document.querySelectorAll('.ttxt');
+    copyRow(txts[i]?txts[i].value:tasks[i].text);
+  };
+  actGroup.appendChild(cpb);
+
+  if(!past){
+    // Paste row button
+    const psb=document.createElement('button');
+    psb.className='btn-ic';psb.innerHTML=SVG_PASTE;psb.title='Paste row content';
+    psb.onclick=()=>pasteRow(d,past,i);
+    actGroup.appendChild(psb);
+
+    // Add row button
+    const ab=document.createElement('button');ab.className='btn-ic';ab.innerHTML=SVG_PL;ab.title='Insert row below';
+    ab.onclick=()=>{
+      const txts=document.querySelectorAll('.ttxt');
+      if(txts[i])tasks[i].text=txts[i].value;
+      tasks.splice(i+1,0,{text:'',done:false});
+      saveDU(d,tasks);rList(d,past);rStrip();focusNth(i+1);
+    };
+    actGroup.appendChild(ab);
+
+    // Delete row button
+    const dl=document.createElement('button');dl.className='btn-ic del';dl.innerHTML=SVG_TR;dl.title='Delete row';
+    dl.onclick=()=>{tasks.splice(i,1);saveDU(d,tasks);rList(d,past);rStrip();};
+    actGroup.appendChild(dl);
+  }
+
+  contentWrap.appendChild(actGroup);
+
+  row.appendChild(cb);
+  row.appendChild(contentWrap);
+
+  // DRAG HANDLE (Only rendered for non-past items, shown ONLY in Edit Mode)
+  if(!past){
+    const dh=document.createElement('div');
+    dh.className='drag-handle';dh.innerHTML=SVG_DRAG;dh.title='Drag to reorder';
+
+    // Touch event dragging
+    dh.addEventListener('touchstart',e=>{
+      if(!editMode)return;
+      e.stopPropagation();
+      dragSrcIdx=i;
+      row.classList.add('dragging');
+    },{passive:true});
+
+    dh.addEventListener('touchmove',e=>{
+      if(!editMode)return;
+      e.preventDefault();
+      const y=e.touches[0].clientY;
+      const els = Array.from(document.querySelectorAll('.task-row:not(.dragging)'));
+      let targetIdx=null;
+      els.forEach(el=>{
+        const rect=el.getBoundingClientRect();
+        if(y>=rect.top&&y<=rect.bottom){targetIdx=parseInt(el.dataset.idx);}
+      });
+      document.querySelectorAll('.task-row').forEach(el=>el.classList.remove('drag-over'));
+      if(targetIdx!==null&&targetIdx!==dragSrcIdx){
+        const tEl=document.querySelector(`.task-row[data-idx="${targetIdx}"]`);
+        if(tEl)tEl.classList.add('drag-over');
+      }
+    },{false:false});
+
+    dh.addEventListener('touchend',e=>{
+      if(!editMode)return;
+      row.classList.remove('dragging');
+      document.querySelectorAll('.task-row').forEach(el=>el.classList.remove('drag-over'));
+      const y=e.changedTouches[0].clientY;
+      const els = Array.from(document.querySelectorAll('.task-row'));
+      let targetIdx=null;
+      els.forEach(el=>{
+        const rect=el.getBoundingClientRect();
+        if(y>=rect.top&&y<=rect.bottom){targetIdx=parseInt(el.dataset.idx);}
+      });
+      if(targetIdx!==null&&targetIdx!==dragSrcIdx){
+        reorderTasks(d, dragSrcIdx, targetIdx);
+      }
+      dragSrcIdx=null;
+    },{passive:true});
+
+    // Desktop/Mouse dragging (Highly Optimized Index-based Transfer)
+    dh.draggable=true;
+    dh.addEventListener('dragstart',e=>{
+      if(!editMode)return;
+      dragSrcIdx=i;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    row.addEventListener('dragover',e=>{
+      if(!editMode)return;
+      e.preventDefault();
+      document.querySelectorAll('.task-row').forEach(el=>el.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+    row.addEventListener('drop',e=>{
+      if(!editMode)return;
+      e.preventDefault();
+      if(dragSrcIdx===null||dragSrcIdx===i)return;
+      reorderTasks(d, dragSrcIdx, i);
+      dragSrcIdx=null;
+    });
+    row.addEventListener('dragend',()=>{
+      row.classList.remove('dragging','drag-over');
+      document.querySelectorAll('.task-row').forEach(el=>el.classList.remove('drag-over'));
+      dragSrcIdx=null;
+    });
+
+    row.appendChild(dh);
+  }
+
+  return row;
+}
+
+// Fixed precise reorder implementation to completely eradicate deletion/empty bug
+function reorderTasks(d, fromIdx, toIdx) {
+  const currentTasks = load(d);
+  if(fromIdx < 0 || fromIdx >= currentTasks.length || toIdx < 0 || toIdx >= currentTasks.length) return;
+  const [moved] = currentTasks.splice(fromIdx, 1);
+  currentTasks.splice(toIdx, 0, moved);
+  saveDU(d, currentTasks);
+  rList(d, false);
+  rStrip();
+}
+
+const DEFAULT_ROWS=5;
+
+function rList(d,past){
+  const el=document.getElementById('tasksList');el.innerHTML='';
+  const tasks=load(d);
+  // Guarantee exact empty rows dynamically
+  while(tasks.length<DEFAULT_ROWS)tasks.push({text:'',done:false});
+  saveD(d,tasks);
+
+  const us=getUS(d);
+  if(us.stack.length===0){us.stack=[JSON.stringify(tasks)];us.idx=0;}
+
+  const fz=document.createElement('div');fz.className='focus-zone';
+  fz.appendChild(makeRow(tasks,0,d,past));
+  el.appendChild(fz);
+
+  const sep=document.createElement('div');sep.className='focus-sep';el.appendChild(sep);
+
+  const tz=document.createElement('div');tz.className='tasks-zone';
+  for(let i=1;i<tasks.length;i++)tz.appendChild(makeRow(tasks,i,d,past));
+
+  if(!past){
+    const ar=document.createElement('div');ar.className='add-row';
+    const inp=document.createElement('input');
+    inp.className='add-inp';inp.type='text';
+    inp.placeholder=''; // Removed placeholder
+    inp.setAttribute('enterkeyhint','next');
+    inp.addEventListener('paste',function(e){
+      e.preventDefault();
+      const raw=(e.clipboardData||window.clipboardData).getData('text');
+      const lines=raw.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+      if(!lines.length)return;
+      const t2=load(d);
+      lines.forEach(l=>t2.push({text:l,done:false}));
+      saveDU(d,t2);rList(d,past);rStrip();
+      setTimeout(()=>{const rows=document.querySelectorAll('.ttxt:not([readonly])');if(rows.length)rows[rows.length-1].focus();},25);
+    });
+    inp.onkeydown=function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        const val=this.value.trim();
+        if(val){const t2=load(d);t2.push({text:val,done:false});saveDU(d,t2);this.value='';rList(d,past);rStrip();}
+        setTimeout(()=>this.focus(),25);
+      }
+    };
+    ar.appendChild(inp);tz.appendChild(ar);
+  }
+  el.appendChild(tz);
+}
+
+function rStrip(){
+  const s=document.getElementById('strip');s.innerHTML='';
+  STRIP_DAYS.forEach(d=>{
+    const past=isPast(d),tod=d.getTime()===TOD,act=d.getTime()===active;
+    const b=document.createElement('button');
+    b.className='dpill'+(tod?' today':'')+(past&&!tod?' past':'')+(act?' active':'')+(load(d).filter(t=>t.text.trim()).length?' has-tasks':'');
+    b.innerHTML=`<div class="pname">${DS[d.getDay()]}</div><div class="pnum">${d.getDate()}</div><div class="pdot"></div>`;
+    b.onclick=()=>{active=d.getTime();goDay(d);};
+    s.appendChild(b);
+  });
+  
+  // Highlight top-left SAT button if active is the previous Saturday
+  const satBtn = document.getElementById('satBtn');
+  if (active === prevSat.getTime()) {
+    satBtn.classList.add('active');
+  } else {
+    satBtn.classList.remove('active');
+  }
+  
+  updateDayCPBtns();
+}
+
+function rWeek(){
+  const wv=document.getElementById('weekView');wv.innerHTML='';
+  COMMON_DAYS.forEach(d=>{
+    const past=isPast(d),tod=d.getTime()===TOD,act=d.getTime()===active;
+    const col=document.createElement('div');
+    col.className='wcol'+(tod?' today':'')+(past?' past-col':'')+(act?' active-col':'');
+    const tasks=load(d).filter(t=>t.text.trim());
+    const MAX=8;const shown=tasks.slice(0,MAX);const extra=tasks.length-MAX;
+    let th=shown.map(t=>`<div class="wt"><div class="wt-box${t.done?' done':''}"></div><div class="wt-txt${t.done?' done':''}">${t.text}</div></div>`).join('');
+    if(extra>0)th+=`<div class="wt-more">+${extra}</div>`;
+    col.innerHTML=`<div class="wcol-head"><div class="wname">${DS[d.getDay()]}</div><div class="wnum">${d.getDate()}</div></div><div class="wtasks">${th}</div>`;
+    
+    col.onclick=()=>{
+      active=d.getTime();
+      goDay(d);
+    };
+    wv.appendChild(col);
+  });
+}
+
+function goPrevSat(){
+  active = prevSat.getTime();
+  goDay(prevSat);
+}
+
+function goDay(d){
+  active=d.getTime();mode='day';
+  document.body.className='m-day'+(editMode?' edit-mode':'');
+  document.getElementById('tlabel').textContent='WEEK';
+  rStrip();rDay();
+}
+
+function toggleView(){
+  if(mode==='day'){
+    mode='week';document.body.className='m-week'+(editMode?' edit-mode':'');
+    document.getElementById('tlabel').textContent='DAY';
+    document.getElementById('weekView').style.gridTemplateColumns='repeat(8,1fr)';
+    rWeek();
+  } else {
+    goDay(new Date(active));
+  }
+}
+
+// Focus management helper
+function focusNth(n){
+  setTimeout(()=>{
+    const rows=document.querySelectorAll('.ttxt:not([readonly])');
+    if(rows[n]){rows[n].focus();try{rows[n].setSelectionRange(0,0);}catch(e){}}
+  },25);
+}
+
+// Paste/past day constraints
+function updateDayCPBtns(){
+  const d=new Date(active);
+  const past=isPast(d);
+  const pasteBtn=document.getElementById('dayPasteBtn');
+
+  if(past) {
+    if(pasteBtn) pasteBtn.style.display = 'none';
+  } else {
+    if(pasteBtn) pasteBtn.style.display = 'block';
+  }
+}
+
+// Render single day logic
+function rDay(){
+  const d=new Date(active),past=isPast(d);
+  const nm=document.getElementById('dvName');
+  nm.textContent=DS[d.getDay()];
+  nm.className='dv-name'+(past?' is-past':'');
+
+  rList(d,past);
+  updateUrBtns(d);
+  updateDayCPBtns();
+}
+
+// Initialise application
+goDay(new Date(TOD));
+</script>
+</body>
+</html>
